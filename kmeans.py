@@ -1,5 +1,3 @@
-import random
-from collections import Counter
 from tkinter import filedialog
 import tkinter as tk
 import pandas as pd
