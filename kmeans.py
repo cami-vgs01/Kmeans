@@ -14,41 +14,47 @@ def lecturaArchivo():
     # Leer el archivo CSV seleccionado
     try:
         dataframe.drop(index=dataframe.index, columns=dataframe.columns, inplace=True)
-        datos = pd.read_csv(archivo_csv)
+        datos = pd.read_csv(archivo_csv, header=None)
         dataframe = pd.concat([dataframe, datos], ignore_index=True)
+        dataframe=dataframe.iloc[1:]
+        for i in range(0, dataframe.shape[1]):
+            dataframe = dataframe.rename(columns={i: "X" + str(i)})
+        dataframe = dataframe.astype(float)
         print("Datos ingresados correctamente")
         return dataframe
     except FileNotFoundError:
         print("No se eligió el archivo")
 
 
-def kmeans(k):
+def kmeans(k, centroides):
     num_filas, num_columnas = dataframe.shape
     print("Numero de variables: ", num_columnas)
-    centroides = None
     datosGrupar = None
+    cont = 0
+
     while True:
+        cont += 1
         if centroides is None:
             #Tomar los centroides iniciales de manera aleatoria y almacenarlos los restantes en otro
-            centroides = dataframe.sample(k)
-            datosGrupar = dataframe.drop(centroides.index)
+            """centroides = dataframe.sample(k)
+            datosGrupar = dataframe.drop(centroides.index)"""
             #Toma los centroides iniciales de manera ordenada del dataframe
-            """indice = int(dataframe.shape[0]-k)
+            indice = int(dataframe.shape[0]-k)
             centroides = dataframe.head(k)
-            datosGrupar = dataframe.tail(indice)"""
+            datosGrupar = dataframe.tail(indice)
 
-        if num_columnas <3:
-            plt.scatter(x=datosGrupar.iloc[:,0], y=datosGrupar.iloc[:,1],c='blue')
-            plt.scatter(x=centroides.iloc[:,0], y=centroides.iloc[:,1], c='red')
-            plt.legend(['Observaciones','Centroides'])
-            plt.show()
-        elif num_columnas == 3:
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='3d')
-            ax.scatter(xs=datosGrupar.iloc[:,0], ys=datosGrupar.iloc[:,1], zs=datosGrupar.iloc[:,2], c='blue')
-            ax.scatter(xs=centroides.iloc[:,0], ys=centroides.iloc[:,1], zs=centroides.iloc[:,2], c='red')
-            plt.legend(['Observaciones','Centroides'])
-            plt.show()
+            if num_columnas <3:
+                plt.scatter(x=datosGrupar.iloc[:,0], y=datosGrupar.iloc[:,1],c='blue')
+                plt.scatter(x=centroides.iloc[:,0], y=centroides.iloc[:,1], c='red')
+                plt.legend(['Observaciones','Centroides'])
+                plt.show()
+            elif num_columnas == 3:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+                ax.scatter(xs=datosGrupar.iloc[:,0], ys=datosGrupar.iloc[:,1], zs=datosGrupar.iloc[:,2], c='blue')
+                ax.scatter(xs=centroides.iloc[:,0], ys=centroides.iloc[:,1], zs=centroides.iloc[:,2], c='red')
+                plt.legend(['Observaciones','Centroides'])
+                plt.show()
         #calculamos la distancia con cada dato de los datosGrupar con cada centroide
         datosGrupar_resultado = datosGrupar.copy()  # Crear una copia de datosGrupar para almacenar los resultados
         for i in range(0, centroides.shape[0]):
@@ -59,8 +65,8 @@ def kmeans(k):
 
         print("Distancias de las observaciones con cada centroide")
         # Encontrar el índice del centroide más cercano para cada fila con axis=1
-        datosGrupar_resultado['Grupo'] = np.argmin(datosGrupar_resultado.iloc[:, 2:].values, axis=1)
-        print(datosGrupar_resultado.iloc[:, 2:])
+        datosGrupar_resultado['Grupo'] = np.argmin(datosGrupar_resultado.iloc[:, num_columnas:].values, axis=1)
+        print(datosGrupar_resultado.iloc[:, num_columnas:])
         nombre_ultima_columna = datosGrupar_resultado.columns[-1]
         palette = sns.color_palette("bright", len(datosGrupar_resultado[nombre_ultima_columna].unique()))
         color_dict = dict(zip(datosGrupar_resultado[nombre_ultima_columna].unique(), palette))
@@ -69,7 +75,37 @@ def kmeans(k):
             dibujar2D(centroides,nombres_columnas,datosGrupar_resultado, color_dict, nombre_ultima_columna)
         elif num_columnas == 3:
             dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_columna)
-        break
+        # Calcular los nuevos centroides
+        centroides_nuevos = datosGrupar_resultado.groupby(['Grupo']).mean().iloc[:, :num_columnas]
+        print("Nuevos centroides")
+        # Comprobar si los centroides han cambiado
+        if centroides.equals(centroides_nuevos):
+            print("Los centroides no han cambiado")
+            print("El algoritmo ha convergido en la iteración: ", cont)
+            break
+        else:
+            print("Los centroides han cambiado")
+            centroides=centroides_nuevos
+    print(centroides)
+    return centroides
+
+def datoAGrupar(centroides):
+    print(centroides)
+    if centroides is None:
+        print("No se han calculado los centroides")
+        return
+    else:
+        dato = input("Ingrese dato a agrupar separado por comas: ")
+        dato = dato.split(",")
+        dato = [float(i) for i in dato]
+        print(dato)
+        distancia = []
+        for i in range(0, centroides.shape[0]):
+            distancia.append(dist.euclidean(centroides.iloc[i, :].values, dato))
+        print(distancia)
+        grupo = np.argmin(distancia)
+        print("El dato pertenece al grupo: ", grupo)
+
 
 def dibujar2D(centroides,nombres_columnas,datosGrupar_resultado,color_dict, nombre_ultima_columna):
     sns.scatterplot(x=nombres_columnas[0], y=nombres_columnas[1], hue=nombre_ultima_columna, data=datosGrupar_resultado, palette=color_dict)
@@ -94,6 +130,7 @@ def dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_co
     plt.show()
 
 def menu():
+    centroides = None
     while True:
         print("*******************Algoritmo de K-Means*******************")
         print("1. Ingresar datos desde archivo .csv")
@@ -120,12 +157,13 @@ def menu():
             elif opc == 3:
                 try:
                     k = int(input("Ingrese el valor de k: "))
-                    kmeans(k)
-                except:
+                    centroides=kmeans(k, centroides)
+                except Exception as e:
+                    print(e)
                     print("No se ingresó un valor de k correcto")
             elif opc == 4:
                 pass
-                #predecirClasificacion(mejorK)
+                datoAGrupar(centroides)
             elif opc == 5:
                 print("Finalizando...")
                 break
