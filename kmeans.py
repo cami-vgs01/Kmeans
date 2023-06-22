@@ -3,6 +3,8 @@ import tkinter as tk
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.spatial.distance as dist
+import numpy as np
+import seaborn as sns
 
 dataframe = pd.DataFrame()
 def lecturaArchivo():
@@ -23,44 +25,75 @@ def lecturaArchivo():
 def kmeans(k):
     num_filas, num_columnas = dataframe.shape
     print("Numero de variables: ", num_columnas)
-    #Tomar los centroides iniciales de manera aleatoria y almacenarlos los restantes en otro
-    """centroides = dataframe.sample(k)
-    datosGrupar = dataframe.drop(centroides.index)"""
-    #Toma los centroides iniciales de manera ordenada del dataframe
-    indice = int(dataframe.shape[0]-k)
-    centroides = dataframe.head(k)
-    datosGrupar = dataframe.tail(indice)
-    if num_columnas <3:
-        dibujar2D(centroides,datosGrupar)
-    elif num_columnas == 3:
-        dibujar3D(centroides,datosGrupar)
-    #calculamos la distancia con cada dato de los datosGrupar con cada centroide
-    datosGrupar_resultado = datosGrupar.copy()  # Crear una copia de datosGrupar para almacenar los resultados
-    for i in range(0, centroides.shape[0]):
-        distancia = []  # Reiniciar la lista en cada iteración del bucle exterior
-        for j in range(0, datosGrupar.shape[0]):
-            distancia.append(dist.euclidean(centroides.iloc[i, :].values, datosGrupar.iloc[j, :].values))
-        datosGrupar_resultado['DistanciaCentroide' + str(i)] = distancia
+    centroides = None
+    datosGrupar = None
+    while True:
+        if centroides is None:
+            #Tomar los centroides iniciales de manera aleatoria y almacenarlos los restantes en otro
+            centroides = dataframe.sample(k)
+            datosGrupar = dataframe.drop(centroides.index)
+            #Toma los centroides iniciales de manera ordenada del dataframe
+            """indice = int(dataframe.shape[0]-k)
+            centroides = dataframe.head(k)
+            datosGrupar = dataframe.tail(indice)"""
 
-    print("Distancias de las observaciones con cada centroide")
-    print(datosGrupar_resultado.iloc[:, 2:])
+        if num_columnas <3:
+            plt.scatter(x=datosGrupar.iloc[:,0], y=datosGrupar.iloc[:,1],c='blue')
+            plt.scatter(x=centroides.iloc[:,0], y=centroides.iloc[:,1], c='red')
+            plt.legend(['Observaciones','Centroides'])
+            plt.show()
+        elif num_columnas == 3:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(xs=datosGrupar.iloc[:,0], ys=datosGrupar.iloc[:,1], zs=datosGrupar.iloc[:,2], c='blue')
+            ax.scatter(xs=centroides.iloc[:,0], ys=centroides.iloc[:,1], zs=centroides.iloc[:,2], c='red')
+            plt.legend(['Observaciones','Centroides'])
+            plt.show()
+        #calculamos la distancia con cada dato de los datosGrupar con cada centroide
+        datosGrupar_resultado = datosGrupar.copy()  # Crear una copia de datosGrupar para almacenar los resultados
+        for i in range(0, centroides.shape[0]):
+            distancia = []  # Reiniciar la lista en cada iteración del bucle exterior
+            for j in range(0, datosGrupar.shape[0]):
+                distancia.append(dist.euclidean(centroides.iloc[i, :].values, datosGrupar.iloc[j, :].values))
+            datosGrupar_resultado['DistanciaCentroide' + str(i)] = distancia
 
-def dibujar2D(centroides,datosGrupar):
-    plt.scatter(x=datosGrupar.iloc[:,0], y=datosGrupar.iloc[:,1],c='blue')
-    plt.scatter(x=centroides.iloc[:,0], y=centroides.iloc[:,1], c='red')
-    plt.legend(['Observaciones','Centroides'])
+        print("Distancias de las observaciones con cada centroide")
+        # Encontrar el índice del centroide más cercano para cada fila con axis=1
+        datosGrupar_resultado['Grupo'] = np.argmin(datosGrupar_resultado.iloc[:, 2:].values, axis=1)
+        print(datosGrupar_resultado.iloc[:, 2:])
+        nombre_ultima_columna = datosGrupar_resultado.columns[-1]
+        palette = sns.color_palette("bright", len(datosGrupar_resultado[nombre_ultima_columna].unique()))
+        color_dict = dict(zip(datosGrupar_resultado[nombre_ultima_columna].unique(), palette))
+        nombres_columnas = list(dataframe.columns)
+        if num_columnas <3:
+            dibujar2D(centroides,nombres_columnas,datosGrupar_resultado, color_dict, nombre_ultima_columna)
+        elif num_columnas == 3:
+            dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_columna)
+        break
+
+def dibujar2D(centroides,nombres_columnas,datosGrupar_resultado,color_dict, nombre_ultima_columna):
+    sns.scatterplot(x=nombres_columnas[0], y=nombres_columnas[1], hue=nombre_ultima_columna, data=datosGrupar_resultado, palette=color_dict)
+    plt.scatter(datosGrupar_resultado.iloc[:,0], datosGrupar_resultado.iloc[:,1], c=datosGrupar_resultado[nombre_ultima_columna].apply(lambda x: color_dict[x]), marker='s')
+    plt.scatter(x=centroides.iloc[:, 0], y=centroides.iloc[:, 1], c='black')
     plt.show()
 
-def dibujar3D(centroides,datosGrupar):
+
+def dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_columna):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(xs=datosGrupar.iloc[:,0], ys=datosGrupar.iloc[:,1], zs=datosGrupar.iloc[:,2], c='blue')
-    ax.scatter(xs=centroides.iloc[:,0], ys=centroides.iloc[:,1], zs=centroides.iloc[:,2], c='red')
-    plt.legend(['Observaciones','Centroides'])
+    clases = datosGrupar_resultado[nombre_ultima_columna].unique()
+    color_dict = {clase: np.random.rand(3,) for clase in clases} # generamos un diccionario con un color aleatorio por cada clase
+    for clase, color in color_dict.items():
+        temp_df = datosGrupar_resultado[datosGrupar_resultado[nombre_ultima_columna] == clase]
+        ax.scatter(temp_df[nombres_columnas[0]], temp_df[nombres_columnas[1]], temp_df[nombres_columnas[2]], color=color, marker='s', label=str(clase))
+    ax.scatter(xs=centroides[nombres_columnas[0]],ys=centroides[nombres_columnas[1]],zs=centroides[nombres_columnas[2]],c='black')
+    ax.set_xlabel(nombres_columnas[0])
+    ax.set_ylabel(nombres_columnas[1])
+    ax.set_zlabel(nombres_columnas[2])
+    plt.legend()
     plt.show()
 
 def menu():
-    mejorK = 0
     while True:
         print("*******************Algoritmo de K-Means*******************")
         print("1. Ingresar datos desde archivo .csv")
