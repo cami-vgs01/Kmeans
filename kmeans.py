@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.spatial.distance as dist
 import numpy as np
 import seaborn as sns
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 dataframe = pd.DataFrame()
 def lecturaArchivo():
@@ -31,7 +32,11 @@ def kmeans(k, centroides):
     print("Numero de variables: ", num_columnas)
     datosGrupar = None
     cont = 0
+    columnas_numericas = dataframe.select_dtypes(include=['int', 'float']).columns
 
+    # Normalizar las columnas numéricas entre 0 y 1
+    scaler = MinMaxScaler()
+    dataframe[columnas_numericas] = scaler.fit_transform(dataframe[columnas_numericas])
     while True:
         cont += 1
         if centroides is None:
@@ -39,9 +44,9 @@ def kmeans(k, centroides):
             """centroides = dataframe.sample(k)
             datosGrupar = dataframe.drop(centroides.index)"""
             #Toma los centroides iniciales de manera ordenada del dataframe
-            indice = int(dataframe.shape[0]-k)
+            #indice = int(dataframe.shape[0]-k)
             centroides = dataframe.head(k)
-            datosGrupar = dataframe.tail(indice)
+            datosGrupar = dataframe.tail(dataframe.shape[0])
 
             if num_columnas <3:
                 plt.scatter(x=datosGrupar.iloc[:,0], y=datosGrupar.iloc[:,1],c='blue')
@@ -77,9 +82,13 @@ def kmeans(k, centroides):
             dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_columna)
         # Calcular los nuevos centroides
         centroides_nuevos = datosGrupar_resultado.groupby(['Grupo']).mean().iloc[:, :num_columnas]
+
         print("Nuevos centroides")
         # Comprobar si los centroides han cambiado
         if centroides.equals(centroides_nuevos):
+            conteo_clusters = datosGrupar_resultado['Grupo'].value_counts()
+            print("Conteo de elementos por clúster:")
+            print(conteo_clusters)
             print("Los centroides no han cambiado")
             print("El algoritmo ha convergido en la iteración: ", cont)
             break
@@ -87,6 +96,11 @@ def kmeans(k, centroides):
             print("Los centroides han cambiado")
             centroides=centroides_nuevos
     print(centroides)
+    # Convertir los centroides a listas
+    centroides_listas = centroides.values.tolist()
+    print("Centroides finales:")
+    for i, centroide_lista in enumerate(centroides_listas):
+        print("Centroide", i, ":", centroide_lista)
     return centroides
 
 def datoAGrupar(centroides):
@@ -109,7 +123,8 @@ def datoAGrupar(centroides):
 
 def dibujar2D(centroides,nombres_columnas,datosGrupar_resultado,color_dict, nombre_ultima_columna):
     sns.scatterplot(x=nombres_columnas[0], y=nombres_columnas[1], hue=nombre_ultima_columna, data=datosGrupar_resultado, palette=color_dict)
-    plt.scatter(datosGrupar_resultado.iloc[:,0], datosGrupar_resultado.iloc[:,1], c=datosGrupar_resultado[nombre_ultima_columna].apply(lambda x: color_dict[x]), marker='s')
+    plt.scatter(datosGrupar_resultado.iloc[:,0], datosGrupar_resultado.iloc[:,1],
+                c=datosGrupar_resultado[nombre_ultima_columna].apply(lambda x: color_dict[x]), marker='s')
     plt.scatter(x=centroides.iloc[:, 0], y=centroides.iloc[:, 1], c='black')
     plt.show()
 
@@ -130,7 +145,6 @@ def dibujar3D(centroides,nombres_columnas,datosGrupar_resultado,nombre_ultima_co
     plt.show()
 
 def menu():
-    centroides = None
     while True:
         print("*******************Algoritmo de K-Means*******************")
         print("1. Ingresar datos desde archivo .csv")
@@ -139,6 +153,7 @@ def menu():
         print("4. Predecir nuevo dato")
         print("5. Salir")
         try:
+            centroides = None
             opc = int(input("Opcion: "))
             if opc == 1:
                 try:
